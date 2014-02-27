@@ -1,0 +1,109 @@
+{% extends "base.html" %}
+{% load cms_tags placeholder_tags menu_tags %}
+{% load link from django_cms_links %}
+{% load url from future %}
+
+{% block foundation_body %}
+  <!-- Header and Nav -->
+
+  <div class="row">
+    <div class="large-3 columns">
+      <h1><img src="http://placehold.it/400x100&text=Logo"></h1>
+    </div>
+    <div class="large-9 columns">
+      <ul class="button-group right">
+        {% show_menu 0 100 100 100 %}
+      </ul>
+    </div>
+  </div>
+
+  <!-- End Header and Nav -->
+
+
+  <!-- First Band (Image) -->
+
+  <div class="row">
+    <div class="large-12 columns">
+      {% placeholder header-image or %}
+      <img src="http://placehold.it/1000x400&text=[img]">
+      {% endplaceholder %}
+      <hr>
+    </div>
+  </div>
+  <!-- Second Band (Image Left with Text) -->
+  {% for post in latest_posts %}
+  <div class="row">
+    <div class="large-4 columns">
+      {% if post.image %}
+      <img src="{{post.image.url}}" width=400 height=300 />
+      {% else %}
+      <img src="http://placehold.it/400x300&text=[img]">
+      {% endif %}
+    </div>
+    <div class="large-8 columns">
+      <h4><a href="{% url 'post-detail'|link:subsite post.publish_on.year post.publish_on.month post.publish_on.day post.slug %}">
+      {{post.title}}
+      </a></h4>
+      <div class="row">
+        <div class="large-6 columns">
+          <strong class="comments">{{ post.publish_on|date:"D, M j, Y" }}</strong>
+          <p>
+                            {% if post.excerpt %}
+                                {{ post.excerpt|removetags:"p"|truncatewords_html:"25"|safe }}
+                            {% else %}
+                                {% filter truncatewords_html:25 %}
+                                    {% render_placeholder post.body %}
+                                {% endfilter %}
+                            {% endif %}
+                            <br/>
+                            <a href="{% url 'post-detail'|link:subsite post.publish_on.year post.publish_on.month post.publish_on.day post.slug %}">
+                                more &gt;
+                            </a>
+            </p>
+        </div>
+        <div class="large-6 columns">
+        </div>
+      </div>
+    </div>
+  </div>
+  {% endfor %}
+
+
+  <!-- Third Band (Image Right with Text) -->
+
+  <div class="row">
+    <div class="large-8 columns">
+      <h4>This is a content section.</h4>
+
+      <p>Bacon ipsum dolor sit amet nulla ham qui sint exercitation eiusmod commodo, chuck duis velit. Aute in reprehenderit, dolore aliqua non est magna in labore pig pork biltong. Eiusmod swine spare ribs reprehenderit culpa. Boudin aliqua adipisicing rump corned beef.</p>
+
+      <p>Pork drumstick turkey fugiat. Tri-tip elit turducken pork chop in. Swine short ribs meatball irure bacon nulla pork belly cupidatat meatloaf cow. Nulla corned beef sunt ball tip, qui bresaola enim jowl. Capicola short ribs minim salami nulla nostrud pastrami.</p>
+
+    </div>
+    <div class="large-4 columns">
+      <img src="http://placehold.it/400x300&text=[img]">
+    </div>
+  </div>
+
+
+  <!-- Footer -->
+
+  <footer class="row">
+    <div class="large-12 columns">
+      <hr />
+      <div class="row">
+        <div class="large-6 columns">
+          <p>&copy; Copyright no one at all. Go to town.</p>
+        </div>
+        <div class="large-6 columns">
+          <ul class="inline-list right">
+            <li><a href="#">Link 1</a></li>
+            <li><a href="#">Link 2</a></li>
+            <li><a href="#">Link 3</a></li>
+            <li><a href="#">Link 4</a></li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </footer>
+{% endblock %}

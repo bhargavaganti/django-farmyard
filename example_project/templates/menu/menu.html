@@ -1,0 +1,11 @@
+{% load menu_tags %}
+{% for child in children %}
+<li class="{% if child.selected %}active{% endif %}{% if child.ancestor %}ancestor active{% endif %}{% if child.sibling %}sibling{% endif %}{% if child.descendant %}descendant{% endif %}">
+	<a class="button" href="{{ child.attr.redirect_url|default:child.get_absolute_url }}"><span>{{ child.get_menu_title }}</span></a>
+	{% if child.children %}
+    <ul>
+        {% show_menu from_level to_level extra_inactive extra_active template "" "" child %}
+    </ul>
+    {% endif %}
+</li>
+{% endfor %}
