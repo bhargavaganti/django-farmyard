@@ -8,10 +8,10 @@ Install
 
 The following will create a virtualenv, install required packages and sync the test database:
 
-```./install```
+    ./install
 
 Then run the app with:
 
-```./run```
+    ./run
 
 
