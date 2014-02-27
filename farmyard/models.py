@@ -6,20 +6,29 @@ from django.contrib.contenttypes import generic
 from django.contrib.auth.models import User
 from django.utils.translation import ugettext_lazy as _
 
-from onec_utils.utils import unique_slugify
-from onec_utils.fields import CurrencyField
-from onec_utils.models import USAddressPhoneMixin
-from photologue.models import Photo
-from markup_mixin.models import MarkupMixin
+from filer.fields.image import FilerImageField
+from localflavor.us.models import USStateField, PhoneNumberField
 from django_extensions.db.models import TitleSlugDescriptionModel, TimeStampedModel
 from notes.models import Note
 from attributes.models import BaseAttribute, AttributeOption
 from uuidfield import UUIDField
 
-from farm.utils import get_fancy_time
-from farm.managers import OnTheFarmManager 
+from farmyard.utils import get_fancy_time, unique_slugify
+from farmyard.managers import OnTheFarmManager 
 
-class Farm(TitleSlugDescriptionModel, TimeStampedModel, USAddressPhoneMixin):
+import logging
+logger = logging.getLogger(__name__)
+
+class USZipcodeField(models.CharField):
+    ''' US Zipcode Field
+
+    A really simple field that just makes sure to pad US zipcodes with zeros if needed.
+    '''
+    def __unicode__(self):
+        return self.rjust(5, '0')
+
+
+class Farm(TitleSlugDescriptionModel, TimeStampedModel):
     """
     Farm model class.
     
@@ -27,15 +36,32 @@ class Farm(TitleSlugDescriptionModel, TimeStampedModel, USAddressPhoneMixin):
     """
     contact=models.CharField(_('Contact'), max_length=200, blank=True, null=True)
     active=models.BooleanField(_('Active'), help_text='Is this your farm?', default=False)
-        
+    address=models.CharField(_('Address'), max_length=255)
+    town=models.CharField(_('Town'), max_length=100)
+    state=USStateField(_('State'))
+    zipcode=USZipcodeField(_('Zip'), max_length=5)
+    phone=PhoneNumberField(_('phone'), blank=True, null=True)
+    lat_long=models.CharField(_('Coordinates'), max_length=255, blank=True, null=True)
+
     class Meta:
         verbose_name=_('Farm')
         verbose_name_plural=_('Farms')
+
+    def save(self, *args, **kwargs):
+        if not self.lat_long:
+            logger.debug("Looking up latitude and longitude for {0} {1}, {2}".format(self.address, self.town, self.state))
+            location = "%s +%s +%s +%s" % (self.address, self.town, self.state, self.zipcode)
+            self.lat_long = google_lat_long(location)
+            if not self.lat_long:
+                location = "%s +%s +%s" % (self.town, self.state, self.zipcode)
+                self.lat_long = google_lat_long(location)
+            logger.debug("Latitude and longitude set to {0} for {1} {2}, {3}".format(self.lat_long, self.address, self.town, self.state))
+        super(Farm, self).save(*args, **kwargs)
   
     def __unicode__(self):
         return u'%s' % self.title
 
-class Genus(TitleSlugDescriptionModel):
+class Genus(TitleSlugDescriptionModel, TimeStampedModel):
     """
     Genus model class.
     
@@ -44,7 +70,6 @@ class Genus(TitleSlugDescriptionModel):
     plural_name=models.CharField(_('Plural name'), help_text="Only use if adding an 's' does not work.", blank=True, null=True, max_length=200)
     technical_name=models.CharField(_('Technical title'), blank=True, null=True, max_length=200)
     
-        
     class Meta:
         verbose_name=_('Genus')
         verbose_name_plural=_('Genus')
@@ -61,7 +86,7 @@ class Genus(TitleSlugDescriptionModel):
         if self.plural_name: return self.plural_name
         else: return self.title + 's'
         
-class Breed(TitleSlugDescriptionModel):
+class Breed(TitleSlugDescriptionModel, TimeStampedModel):
     """
     Breed model class.
     
@@ -105,7 +130,7 @@ class SecondaryBreed(models.Model):
     def __unicode__(self):
         return u'%s (%s)' % (self.breed, self.percentage )
 
-class Animal(MarkupMixin, TimeStampedModel):
+class Animal(TimeStampedModel):
     """
     Animal model class.
     
@@ -129,8 +154,7 @@ class Animal(MarkupMixin, TimeStampedModel):
     birthtime = models.TimeField(_('Birthtime'), blank=True, null=True)
     deathday = models.DateField(_('Deathday'), blank=True, null=True)
     description = models.TextField(_('Description'), blank=True, null=True)
-    rendered_description = models.TextField(_('Rendered description'), blank=True, null=True, editable=False)
-    photos=models.ManyToManyField(Photo, blank=True, null=True)
+    image = FilerImageField(blank=True, null=True)
     sex=models.CharField(_('Sex'), choices=SEX_CHOICES, default='f', max_length=1)
 
     notes=generic.GenericRelation(Note)
@@ -142,10 +166,6 @@ class Animal(MarkupMixin, TimeStampedModel):
     class Meta:
         verbose_name=_('Animal')
         verbose_name_plural=_('Animals')
-
-    class MarkupOptions:
-        source_field = 'description'
-        rendered_field = 'rendered_description'
 
     def save(self, *args, **kwargs):
         super(Animal, self).save(*args, **kwargs)
@@ -314,189 +334,4 @@ class AnimalRegistration(models.Model):
         verbose_name_plural=_('Animals registrations')
   
     def __unicode__(self):
-        return u'Registration of %s at %s' % (self.animal, self.body)
-    
-class ProductType(TitleSlugDescriptionModel):
-    """
-    ProductType model class.
-    
-    Keeps track of the various product types on a farm, such as produce, meat, soap, preserves etc...
-    """
-        
-    class Meta:
-        verbose_name=_('Product type')
-        verbose_name_plural=_('Product types')
-  
-    def __unicode__(self):
-        return u'%s' % self.title
-
-    @models.permalink
-    def get_absolute_url(self):
-        return ('fm-product-type-detail', None, {'slug': self.slug})
-        
-class ProductAttributeOption(AttributeOption):
-
-    class Meta:
-        verbose_name = _('Product attribute options')
-        verbose_name_plural = _('Product attribute options')
-
-class ProductAttribute(BaseAttribute):
-    product = models.ForeignKey('Product')
-
-    class Meta:
-        verbose_name = _('Product attribute')
-        verbose_name_plural = _('Product attributes')
-
-class Product(TitleSlugDescriptionModel, TimeStampedModel):
-    type = models.ForeignKey(ProductType)
-    photos=models.ManyToManyField(Photo, blank=True, null=True)
-    price=CurrencyField(_('Price'), blank=True, null=True, decimal_places=2, max_digits=5)
-    unit=models.CharField(_('Unit'), blank=True, null=True, max_length=100)
-    verbose_price=models.CharField(_('Verbose price'), blank=True, null=True, max_length=255)
-
-    class Meta:
-        verbose_name=_('Product')
-        verbose_name_plural=_('Products')
-  
-    def __unicode__(self):
-        return u'%s' % self.title
-        
-    @models.permalink
-    def get_absolute_url(self):
-        return ('fm-product-detail', None, {'slug': self.slug, 'type_slug': self.type.slug})
-
-class Building(MarkupMixin, TitleSlugDescriptionModel, TimeStampedModel):
-    farm=models.ForeignKey(Farm)
-    built=models.DateField(_('Built'), blank=True, null=True)
-    photos=models.ManyToManyField(Photo, blank=True, null=True)
-    rendered_description=models.TextField(_('Rendered description'), blank=True, null=True, editable=False)
-
-    class Meta:
-        verbose_name=_('Building')
-        verbose_name_plural=_('Buildings')
-
-    class MarkupOptions:
-        source_field = 'description'
-        rendered_field = 'rendered_description'
-  
-    def __unicode__(self):
-        return u'%s' % self.title
-
-    def __init__(self, *args, **kwargs):
-        super (Building, self).__init__(*args, **kwargs)
-        self._age = None
-        
-    @property
-    def age(self):
-        if not self._age:
-            if self.built:
-                DELTA=datetime.now()
-                self._age = get_fancy_time(relativedelta(DELTA, self.built), True)
-            else: self._age = "Unknown"
-        return self._age
-
-    @models.permalink
-    def get_absolute_url(self):
-        return ('fm-building-detail', None, {'slug': self.slug})
-
-class BuildingAttributeOption(AttributeOption):
-
-    class Meta:
-        verbose_name = _('Building attribute options')
-        verbose_name_plural = _('Building attribute options')
-
-class BuildingAttribute(BaseAttribute):
-    option = models.ForeignKey(BuildingAttributeOption)
-    building = models.ForeignKey(Building)
-
-    class Meta:
-        verbose_name = _('Building attribute')
-        verbose_name_plural = _('Building attributes')
-
-    def __unicode__(self):
-        return u'%s attribute of %s' %(self.option, self.building.title)
-
-class BuildingSpace(MarkupMixin, TitleSlugDescriptionModel):
-    """
-    Bulding Space model class.
-
-    Keeps track of the various spaces in a bulding (rooms, lofts, corners
-    etc...)
-    """
-    building=models.ForeignKey(Building)
-    photos = models.ManyToManyField(Photo, blank=True, null=True)
-    rendered_description=models.TextField(_('Rendered description'), blank=True, null=True)
-
-    class Meta:
-        verbose_name=_('Building space')
-        verbose_name_plural=_('Building spaces')
-
-    class MarkupOptions:
-        source_field = 'description'
-        rendered_field = 'rendered_description'
-  
-    def __unicode__(self):
-        return u'%s' % self.title
-
-    def __init__(self, *args, **kwargs):
-        super (BuildingSpace, self).__init__(*args, **kwargs)
-
-class FieldType(TitleSlugDescriptionModel):
-    """
-    Field Type model class.
-    
-    Keeps track of the various field types on a farm, such as pasture, garden,
-    grain, etc...
-    """
-        
-    class Meta:
-        verbose_name=_('Field type')
-        verbose_name_plural=_('Field types')
-  
-    def __unicode__(self):
-        return u'%s' % self.title
-
-    @models.permalink
-    def get_absolute_url(self):
-        return ('fm-field-type-detail', None, {'slug': self.slug})
-
-class Field(MarkupMixin, TitleSlugDescriptionModel, TimeStampedModel):
-    farm=models.ForeignKey(Farm)
-    type=models.ForeignKey(FieldType, blank=True, null=True)
-    photos=models.ManyToManyField(Photo, blank=True, null=True)
-    rendered_description=models.TextField(_('Rendered description'), blank=True, null=True, editable=False)
-
-    class Meta:
-        verbose_name=_('Field')
-        verbose_name_plural=_('Fields')
-
-    class MarkupOptions:
-        source_field = 'description'
-        rendered_field = 'rendered_description'
-  
-    def __unicode__(self):
-        return u'%s' % self.title
-
-    def __init__(self, *args, **kwargs):
-        super (Field, self).__init__(*args, **kwargs)
-        
-    @models.permalink
-    def get_absolute_url(self):
-        return ('fm-field-detail', None, {'slug': self.slug})
-
-class FieldAttributeOption(AttributeOption):
-
-    class Meta:
-        verbose_name = _('Field attribute options')
-        verbose_name_plural = _('Field attribute options')
-
-class FieldAttribute(BaseAttribute):
-    option = models.ForeignKey(FieldAttributeOption)
-    field = models.ForeignKey(Field)
-
-    class Meta:
-        verbose_name = _('Field attribute')
-        verbose_name_plural = _('Field attributes')
-
-    def __unicode__(self):
-        return u'%s attribute of %s' %(self.option, self.field.title)
+        return u'Registration of {0} at {1}'.format(self.animal, self.body)
