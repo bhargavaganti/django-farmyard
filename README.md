@@ -6,11 +6,11 @@ Here we manage our animals, when they're born, who they're born to, and all the 
 Install
 --------
 
-1. The following will create a virtualenv, install required packages and sync the test database:
+The following will create a virtualenv, install required packages and sync the test database:
 
     ./install
 
-2. Then run the app with:
+Then run the app with:
 
     ./run
 
