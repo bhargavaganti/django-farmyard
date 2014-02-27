@@ -1,2 +1,2 @@
 #!/bin/bash
-python manage.py runserver_plus
+venv/bin/python manage.py runserver_plus
