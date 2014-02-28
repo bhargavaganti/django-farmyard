@@ -1,6 +1,6 @@
 from setuptools import setup, find_packages
 from setuptools.command.test import test as TestCommand
-import os
+import sys
 
 #APP_NAME should be the module name as python sees it.
 APP_NAME = 'farmyard'
@@ -22,11 +22,13 @@ REQUIREMENTS = [
     'south==0.8.2',
 ]
 
+
 class Tox(TestCommand):
     def finalize_options(self):
         TestCommand.finalize_options(self)
         self.test_args = []
         self.test_suite = True
+
     def run_tests(self):
         #import here, cause outside the eggs aren't loaded
         import tox
@@ -34,21 +36,21 @@ class Tox(TestCommand):
         sys.exit(errno)
 
 setup(
-    name = APP_NAME,
-    version = VERSION,
-    url = 'http://github.com/powellc/farmyard',
-    license = 'BSD',
+    name=APP_NAME,
+    version=VERSION,
+    url='http://github.com/powellc/django-farmyard',
+    license='BSD',
     platforms=['OS Independent'],
-    description = DESCRIPTION,
+    description=DESCRIPTION,
     author='Colin Powell',
-    author_email = 'info@timberwyckfarm.com',
+    author_email='info@timberwyckfarm.com',
     packages=find_packages(),
-    install_requires = REQUIREMENTS,
+    install_requires=REQUIREMENTS,
     include_package_data=True,
     zip_safe=False,
     tests_require=['tox'],
-    cmdclass = {'test': Tox},
-    classifiers = [
+    cmdclass={'test': Tox},
+    classifiers=[
         'Development Status :: 4 - Beta',
         'Framework :: Django',
         'Intended Audience :: Developers',
