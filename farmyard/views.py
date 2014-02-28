@@ -1,16 +1,12 @@
-import datetime
 from django.views.generic import DetailView, ListView
 
 from django.core.exceptions import ObjectDoesNotExist
-from django.http import HttpResponseRedirect, Http404
-from django.shortcuts import get_list_or_404, render_to_response, get_object_or_404
-from django.template import RequestContext
-from django.core.urlresolvers import reverse
-from django.conf import settings
+from django.http import Http404
 
 from notes.forms import BriefNoteForm
 
 from farmyard.models import Animal, Breed,  Milking
+
 
 class BreedDetailView(DetailView):
     model = Breed
@@ -18,30 +14,35 @@ class BreedDetailView(DetailView):
     def get_queryset(self, *args, **kwargs):
         return Breed.objects.filter(genus__slug=self.kwargs['genus_slug'])
 
+
 class MilkingListView(ListView):
     model = Animal
 
     def get_queryset(self, *args, **kwargs):
         try:
-            animal = Animal.objects.get(self.kwargs.get('slug', None))
-            qs = Milking.objects.filter(animal__primary_breed__genus__slug=self.kwargs['genus_slug'], 
-				                    	animal__primary_breed__slug=self.kwargs['breed_slug'], 
-                                        animal__slug=self.kwargs['slug'])
+            #animal = Animal.objects.get(self.kwargs.get('slug', None))
+            qs = Milking.objects.filter(
+                animal__primary_breed__genus__slug=self.kwargs['genus_slug'],
+                animal__primary_breed__slug=self.kwargs['breed_slug'],
+                animal__slug=self.kwargs['slug'])
         except:
             try:
-                qs = Milking.objects.filter(animal__primary_breed__genus__slug=self.kwargs['genus_slug'], 
-                                            animal__primary_breed__slug=self.kwargs['breed_slug'], 
-                                            animal__uuid__contains=self.kwargs['slug'])
+                qs = Milking.objects.filter(
+                    animal__primary_breed__genus__slug=self.kwargs['genus_slug'],
+                    animal__primary_breed__slug=self.kwargs['breed_slug'],
+                    animal__uuid__contains=self.kwargs['slug'])
             except:
                 qs = None
         return qs
+
 
 class AnimalDetailView(DetailView):
     model = Animal
 
     def get_queryset(self, *args, **kwargs):
-        return Animal.objects.filter(primary_breed__genus__slug=self.kwargs['genus_slug'], 
-                                     primary_breed__slug=self.kwargs['breed_slug'])
+        return Animal.objects.filter(
+            primary_breed__genus__slug=self.kwargs['genus_slug'],
+            primary_breed__slug=self.kwargs['breed_slug'])
 
     def get_object(self, queryset=None):
         if queryset is None:
@@ -60,8 +61,9 @@ class AnimalDetailView(DetailView):
                 try:
                     obj = queryset.get(slug=slug_or_uuid)
                 except ObjectDoesNotExist:
-                    raise Http404(_(u"No %(verbose_name)s found matching the query") %
-                                   {'verbose_name': queryset.model._meta.verbose_name})
+                    raise Http404(
+                        (u"No %(verbose_name)s found matching the query") %
+                        {'verbose_name': queryset.model._meta.verbose_name})
 
         # If none of those are defined, it's an error.
         else:
